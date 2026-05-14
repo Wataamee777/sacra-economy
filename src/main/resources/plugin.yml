@@ -1,0 +1,19 @@
+name: SacraEconomy
+version: '1.0.0'
+main: sc.sacra.economy.SacraEconomyPlugin
+api-version: '1.21'
+depend: [Vault]
+author: Sacra
+commands:
+  company:
+    description: Company creation and deletion commands.
+    usage: /company <new|del> <会社名>
+  license:
+    description: Business license commands.
+    usage: /license buy <1-5>
+  money:
+    description: Economy transfer, ranking, and giveaway commands.
+    usage: /money <pay|rank|giveaway>
+  op:
+    description: SacraEconomy operator commands.
+    usage: /op <money|company>
