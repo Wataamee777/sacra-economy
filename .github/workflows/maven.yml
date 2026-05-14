@@ -3,8 +3,7 @@ name: Maven CI
 on:
   push:
     branches:
-      - "**"
-  pull_request:
+      - "main"
 
 permissions:
   contents: read
@@ -13,6 +12,7 @@ jobs:
   build:
     name: Build with Maven
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[mvn skip]')"
 
     steps:
       - name: Checkout repository
@@ -25,5 +25,12 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build and verify
-        run: mvn --batch-mode --update-snapshots verify
+      - name: Build and package
+        run: mvn --batch-mode --update-snapshots clean package
+
+      # 生成されたビルド成果物（Artifact）をアップロードするステップ
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-build-artifacts
+          path: target/*.jar # もしWARファイルの場合は target/*.war に変更してください
