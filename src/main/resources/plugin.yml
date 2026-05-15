@@ -1,7 +1,8 @@
 name: SacraEconomy
-version: '1.2.0'
+version: '${project.version}'
 main: sc.sacra.economy.SacraEconomyPlugin
 api-version: '1.21'
+description: '${project.description}'
 depend: [Vault]
 author: Sacra
 commands:

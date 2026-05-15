@@ -5,11 +5,11 @@
 
     <groupId>sc.sacra</groupId>
     <artifactId>sacra-economy</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
     <packaging>jar</packaging>
 
     <name>SacraEconomy</name>
-    <description>Minimal economy, company, and business license plugin for Paper/Spigot.</description>
+    <description>Sacra(sakuracraft)only plugin</description>
 
     <properties>
         <java.version>21</java.version>
@@ -53,6 +53,13 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -81,6 +88,10 @@
                                 <relocation>
                                     <pattern>com.zaxxer.hikari</pattern>
                                     <shadedPattern>sc.sacra.economy.libs.hikari</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.mysql</pattern>
+                                    <shadedPattern>sc.sacra.economy.libs.mysql</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>

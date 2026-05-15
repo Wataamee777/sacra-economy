@@ -359,8 +359,8 @@ public final class MySqlEconomyStore implements AutoCloseable {
         });
     }
 
-    public static BigDecimal money(String text) {
-        return new BigDecimal(text).setScale(2, RoundingMode.HALF_UP);
+    public static BigDecimal money(int value) {
+        return new BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
     }
 
     public static String format(BigDecimal amount) {
