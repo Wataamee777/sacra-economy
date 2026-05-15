@@ -7,11 +7,11 @@ import org.jetbrains.annotations.NotNull;
 import sc.sacra.economy.CommandFeedback;
 import sc.sacra.economy.db.MySqlEconomyStore;
 
-public final class OpCommand implements CommandExecutor {
+public final class AdminCommand implements CommandExecutor {
     private final MySqlEconomyStore store;
     private final CommandFeedback feedback;
 
-    public OpCommand(MySqlEconomyStore store, CommandFeedback feedback) {
+    public AdminCommand(MySqlEconomyStore store, CommandFeedback feedback) {
         this.store = store;
         this.feedback = feedback;
     }
@@ -77,6 +77,6 @@ public final class OpCommand implements CommandExecutor {
     }
 
     private void usage(CommandSender sender) {
-        feedback.send(sender, "§e/op money add [MCID] [金額] §7/ §e/op money delete [MCID] §7/ §e/op company add [社長MCID] [会社名] §7/ §e/op company delete [会社名]");
+        feedback.send(sender, "§e/admin money add [MCID] [金額] §7/ §e/admin money delete [MCID] §7/ §e/admin company add [社長MCID] [会社名] §7/ §e/admin company delete [会社名]");
     }
 }

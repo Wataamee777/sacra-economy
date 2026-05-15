@@ -23,8 +23,8 @@ import java.util.concurrent.Executors;
 
 public final class MySqlEconomyStore implements AutoCloseable {
     public static final String GOVERNMENT_WALLET = "Government_Wallet";
-    public static final BigDecimal COMPANY_CAPITAL = money("100000");
-    public static final BigDecimal COMPANY_TAX = money("1000");
+    public static final BigDecimal COMPANY_CAPITAL = money(config.getInt(company.capital, 100000));
+    public static final BigDecimal COMPANY_TAX = money(config.getInt(company.tax, 1000));
     public static final BigDecimal COMPANY_TOTAL_COST = COMPANY_CAPITAL.add(COMPANY_TAX);
     public static final BigDecimal LICENSE_COMPANY_DISCOUNT = new BigDecimal("0.90");
 
