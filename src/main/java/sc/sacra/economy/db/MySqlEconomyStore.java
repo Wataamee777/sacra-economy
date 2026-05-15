@@ -16,6 +16,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -47,9 +48,9 @@ public final class MySqlEconomyStore implements AutoCloseable {
         boolean useSsl = config.getBoolean("mysql.useSSL", false);
 
         HikariConfig hikari = new HikariConfig();
-        hikari.setJdbcUrl("jdbc:mysql://%s:%d/%s?useSSL=%s&allowPublicKeyRetrieval=true&characterEncoding=utf8&serverTimezone=UTC"
+        hikari.setJdbcUrl("jdbc:mysql://%s:%d/%s?useSSL=%s&allowPublicKeyRetrieval=true&characterEncoding=utf8&useUnicode=true&serverTimezone=UTC"
                 .formatted(host, port, database, useSsl));
-        
+        hikari.setDriverClassName("com.mysql.cj.jdbc.Driver");
         hikari.setUsername(config.getString("mysql.username", "root"));
         hikari.setPassword(config.getString("mysql.password", ""));
         hikari.setMaximumPoolSize(config.getInt("mysql.pool-size", 10));
@@ -64,13 +65,13 @@ public final class MySqlEconomyStore implements AutoCloseable {
         }
 
         // 非同期処理用スレッドプール
-        this.executor = Executors.newFixedThreadPool(Math.max(2, hikari.getMaximumPoolSize()), runnable -> {
+        this.executor = Executors.newFixedThreadPool(Math.max(2, config.getInt("mysql.pool-size", 10)), runnable -> {
             Thread thread = new Thread(runnable, "SacraEconomy-DB");
             thread.setDaemon(true);
             return thread;
         });
     }
-    
+
     public CompletableFuture<Void> initialize() {
         return run(() -> {
             try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
@@ -109,6 +110,13 @@ public final class MySqlEconomyStore implements AutoCloseable {
                             used_by VARCHAR(32) NULL,
                             used_at TIMESTAMP NULL,
                             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                        """);
+                statement.executeUpdate("""
+                        CREATE TABLE IF NOT EXISTS ec_daily_bonuses (
+                            mcid VARCHAR(32) NOT NULL PRIMARY KEY,
+                            last_claim_date DATE NOT NULL,
+                            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                         """);
             }
@@ -265,6 +273,30 @@ public final class MySqlEconomyStore implements AutoCloseable {
                 }
             }
         });
+    }
+
+    public CompletableFuture<Boolean> claimDailyLoginBonus(String mcid, BigDecimal amount, LocalDate today) {
+        return supply(() -> inTransaction(connection -> {
+            ensureAccountSync(connection, mcid);
+            try (PreparedStatement select = connection.prepareStatement("SELECT last_claim_date FROM ec_daily_bonuses WHERE mcid = ? FOR UPDATE")) {
+                select.setString(1, mcid);
+                try (ResultSet result = select.executeQuery()) {
+                    if (result.next() && today.equals(result.getDate("last_claim_date").toLocalDate())) {
+                        return false;
+                    }
+                }
+            }
+            addBalance(connection, mcid, amount);
+            try (PreparedStatement upsert = connection.prepareStatement("""
+                    INSERT INTO ec_daily_bonuses (mcid, last_claim_date) VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE last_claim_date = VALUES(last_claim_date)
+                    """)) {
+                upsert.setString(1, mcid);
+                upsert.setDate(2, java.sql.Date.valueOf(today));
+                upsert.executeUpdate();
+            }
+            return true;
+        }));
     }
 
     public CompletableFuture<CommandResult> redeemCode(String mcid, String code) {

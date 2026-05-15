@@ -35,6 +35,7 @@ public final class SacraEconomyPlugin extends JavaPlugin {
             }
             vaultEconomy = new SacraVaultEconomy(store);
             getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Highest);
+            getServer().getPluginManager().registerEvents(new DailyLoginBonusListener(this, store, feedback), this);
             getLogger().info("SacraEconomy has been enabled as the Vault economy provider.");
         }));
     }
