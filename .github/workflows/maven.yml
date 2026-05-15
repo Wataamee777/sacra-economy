@@ -28,9 +28,17 @@ jobs:
       - name: Build and package
         run: mvn --batch-mode --update-snapshots clean package
 
-      # 生成されたビルド成果物（Artifact）をアップロードするステップ
+      # pom.xml からバージョン番号を取得して環境変数に格納するステップ
+      - name: Extract Maven Project Version
+        id: get_version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "PROJECT_VERSION=${VERSION}" >> $GITHUB_ENV
+
+      # 動的なファイル名（バージョンを含む）でビルド成果物をアップロード
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: maven-build-artifacts
-          path: target/*.jar # もしWARファイルの場合は target/*.war に変更してください
+          # WARファイルの場合は、末尾の .jar を .war に書き換えてください
+          path: target/*-${{ env.PROJECT_VERSION }}.jar
