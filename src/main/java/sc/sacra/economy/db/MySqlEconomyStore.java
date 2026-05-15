@@ -23,17 +23,25 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MySqlEconomyStore implements AutoCloseable {
-    public static final String GOVERNMENT_WALLET = "Government_Wallet";
-    public static final BigDecimal COMPANY_CAPITAL = money("100000");
-    public static final BigDecimal COMPANY_TAX = money("1000");
-    public static final BigDecimal COMPANY_TOTAL_COST = COMPANY_CAPITAL.add(COMPANY_TAX);
-    public static final BigDecimal LICENSE_COMPANY_DISCOUNT = new BigDecimal("0.90");
-
     private final HikariDataSource dataSource;
     private final ExecutorService executor;
 
+    // 設定値はインスタンス変数として管理（プラグインのリロードに対応しやすいため）
+    public final String GOVERNMENT_WALLET = "Government_Wallet";
+    public final BigDecimal COMPANY_CAPITAL;
+    public final BigDecimal COMPANY_TAX;
+    public final BigDecimal COMPANY_TOTAL_COST;
+    public final BigDecimal LICENSE_COMPANY_DISCOUNT = new BigDecimal("0.90");
+
     public MySqlEconomyStore(JavaPlugin plugin) {
         FileConfiguration config = plugin.getConfig();
+
+        // 数値の初期化
+        this.COMPANY_CAPITAL = money(config.getInt("company.capital", 100000));
+        this.COMPANY_TAX = money(config.getInt("company.tax", 1000));
+        this.COMPANY_TOTAL_COST = COMPANY_CAPITAL.add(COMPANY_TAX);
+
+        // HikariCPの設定
         String host = config.getString("mysql.host", "localhost");
         int port = config.getInt("mysql.port", 3306);
         String database = config.getString("mysql.database", "minecraft");
@@ -47,7 +55,16 @@ public final class MySqlEconomyStore implements AutoCloseable {
         hikari.setPassword(config.getString("mysql.password", ""));
         hikari.setMaximumPoolSize(config.getInt("mysql.pool-size", 10));
         hikari.setPoolName("SacraEconomyPool");
-        this.dataSource = new HikariDataSource(hikari);
+
+        // 接続の初期化
+        try {
+            this.dataSource = new HikariDataSource(hikari);
+        } catch (Exception e) {
+            plugin.getLogger().severe("データベース接続に失敗しました。設定を確認してください。");
+            throw e;
+        }
+
+        // 非同期処理用スレッドプール
         this.executor = Executors.newFixedThreadPool(Math.max(2, config.getInt("mysql.pool-size", 10)), runnable -> {
             Thread thread = new Thread(runnable, "SacraEconomy-DB");
             thread.setDaemon(true);
@@ -456,10 +473,10 @@ public final class MySqlEconomyStore implements AutoCloseable {
 
     @Override
     public void close() {
-        executor.shutdownNow();
-        dataSource.close();
+        if (executor != null) executor.shutdown();
+        if (dataSource != null) dataSource.close();
     }
-
+    
     @FunctionalInterface
     private interface SqlCallable<T> {
         T call(Connection connection) throws SQLException;

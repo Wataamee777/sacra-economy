@@ -8,7 +8,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import sc.sacra.economy.command.CompanyCommand;
 import sc.sacra.economy.command.LicenseCommand;
 import sc.sacra.economy.command.MoneyCommand;
-import sc.sacra.economy.command.OpCommand;
+import sc.sacra.economy.command.AdminCommand;
 import sc.sacra.economy.db.MySqlEconomyStore;
 import sc.sacra.economy.vault.SacraVaultEconomy;
 
@@ -25,7 +25,7 @@ public final class SacraEconomyPlugin extends JavaPlugin {
         registerCommand("company", new CompanyCommand(store, feedback));
         registerCommand("license", new LicenseCommand(store, feedback));
         registerCommand("money", new MoneyCommand(store, feedback));
-        registerCommand("op", new OpCommand(store, feedback));
+        registerCommand("admin", new AdminCommand(store, feedback));
 
         store.initialize().whenComplete((ignored, throwable) -> Bukkit.getScheduler().runTask(this, () -> {
             if (throwable != null) {

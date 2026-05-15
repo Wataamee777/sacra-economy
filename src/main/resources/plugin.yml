@@ -14,6 +14,6 @@ commands:
   money:
     description: Economy transfer, ranking, and giveaway commands.
     usage: /money <pay|rank|giveaway>
-  op:
+  admin:
     description: SacraEconomy operator commands.
-    usage: /op <money|company>
+    usage: /admin <money|company>

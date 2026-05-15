@@ -3,8 +3,7 @@ name: Maven CI
 on:
   push:
     branches:
-      - "**"
-  pull_request:
+      - "main"
 
 permissions:
   contents: read
@@ -13,6 +12,7 @@ jobs:
   build:
     name: Build with Maven
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[mvn skip]')"
 
     steps:
       - name: Checkout repository
@@ -25,5 +25,20 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build and verify
-        run: mvn --batch-mode --update-snapshots verify
+      - name: Build and package
+        run: mvn --batch-mode --update-snapshots clean package
+
+      # pom.xml からバージョン番号を取得して環境変数に格納するステップ
+      - name: Extract Maven Project Version
+        id: get_version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "PROJECT_VERSION=${VERSION}" >> $GITHUB_ENV
+
+      # 動的なファイル名（バージョンを含む）でビルド成果物をアップロード
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-build-artifacts
+          # WARファイルの場合は、末尾の .jar を .war に書き換えてください
+          path: target/*-${{ env.PROJECT_VERSION }}.jar
