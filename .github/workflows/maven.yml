@@ -41,4 +41,4 @@ jobs:
         with:
           name: maven-build-artifacts
           # WARファイルの場合は、末尾の .jar を .war に書き換えてください
-          path: target/Sacra*.jar
+          path: target/*.jar
