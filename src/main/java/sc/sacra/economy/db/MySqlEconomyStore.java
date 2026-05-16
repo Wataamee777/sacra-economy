@@ -8,6 +8,7 @@ import sc.sacra.economy.model.CommandResult;
 import sc.sacra.economy.model.Company;
 import sc.sacra.economy.model.LicenseCategory;
 import sc.sacra.economy.model.OperationLogEntry;
+import sc.sacra.economy.model.QuestReward;
 import sc.sacra.economy.model.RankEntry;
 
 import java.math.BigDecimal;
@@ -372,6 +373,38 @@ public final class MySqlEconomyStore implements AutoCloseable {
             addBalance(connection, mcid, reward);
             insertOperationLog(connection, "SYSTEM", mcid, "QUEST_CLAIM", reward, "実績報酬: %s (%s)".formatted(advancementKey, level));
             return CommandResult.ok("実績報酬 %s円 を受け取りました。実績: %s / レベル: %s".formatted(format(reward), advancementKey, level.toLowerCase(java.util.Locale.ROOT)));
+        }));
+    }
+
+    public CompletableFuture<CommandResult> claimQuestRewards(String mcid, List<QuestReward> rewards) {
+        return supply(() -> inTransaction(connection -> {
+            ensureAccountSync(connection, mcid);
+            BigDecimal total = BigDecimal.ZERO.setScale(2);
+            int claimed = 0;
+            for (QuestReward reward : rewards) {
+                try (PreparedStatement insert = connection.prepareStatement("""
+                        INSERT IGNORE INTO ec_quest_claims (mcid, advancement_key, level, reward)
+                        VALUES (?, ?, ?, ?)
+                        """)) {
+                    insert.setString(1, mcid);
+                    insert.setString(2, reward.advancementKey());
+                    insert.setString(3, reward.level());
+                    insert.setBigDecimal(4, reward.reward());
+                    if (insert.executeUpdate() == 0) {
+                        continue;
+                    }
+                }
+                claimed++;
+                total = total.add(reward.reward());
+                insertOperationLog(connection, "SYSTEM", mcid, "QUEST_CLAIM", reward.reward(),
+                        "実績報酬: %s (%s)".formatted(reward.advancementKey(), reward.level()));
+            }
+
+            if (claimed == 0) {
+                return CommandResult.error("受け取り可能な未受取の実績報酬はありません。");
+            }
+            addBalance(connection, mcid, total);
+            return CommandResult.ok("解除済み実績報酬を %d件受け取りました。合計: %s円".formatted(claimed, format(total)));
         }));
     }
 

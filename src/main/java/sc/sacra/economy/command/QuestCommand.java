@@ -14,9 +14,12 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import sc.sacra.economy.CommandFeedback;
 import sc.sacra.economy.db.MySqlEconomyStore;
+import sc.sacra.economy.model.QuestReward;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -39,8 +42,13 @@ public final class QuestCommand implements CommandExecutor {
             sender.sendMessage("このコマンドはプレイヤーのみ実行できます。");
             return true;
         }
-        if (args.length != 2 || !args[0].equalsIgnoreCase("claim")) {
+        if (args.length < 1 || args.length > 2 || !args[0].equalsIgnoreCase("claim")) {
             usage(sender);
+            return true;
+        }
+
+        if (args.length == 1) {
+            claimAll(sender, player);
             return true;
         }
 
@@ -50,28 +58,48 @@ public final class QuestCommand implements CommandExecutor {
             return true;
         }
 
-        Advancement target = advancement.get();
-        AdvancementProgress progress = player.getAdvancementProgress(target);
-        if (!progress.isDone()) {
-            feedback.send(sender, "その実績はまだ解除されていません: " + target.getKey());
+        Optional<QuestReward> reward = rewardFor(player, advancement.get());
+        if (reward.isEmpty()) {
+            feedback.send(sender, "その実績は未解除、または報酬対象外です: " + advancement.get().getKey());
             return true;
         }
 
-        AdvancementDisplay display = target.getDisplay();
+        QuestReward questReward = reward.get();
+        feedback.handle(sender, store.claimQuestReward(player.getName(), questReward.advancementKey(), questReward.level(), questReward.reward()));
+        return true;
+    }
+
+    private void claimAll(CommandSender sender, Player player) {
+        List<QuestReward> rewards = new ArrayList<>();
+        Iterator<Advancement> iterator = Bukkit.advancementIterator();
+        while (iterator.hasNext()) {
+            rewardFor(player, iterator.next()).ifPresent(rewards::add);
+        }
+
+        if (rewards.isEmpty()) {
+            feedback.send(sender, "受け取り可能な解除済み実績報酬はありません。");
+            return;
+        }
+        feedback.handle(sender, store.claimQuestRewards(player.getName(), rewards));
+    }
+
+    private Optional<QuestReward> rewardFor(Player player, Advancement advancement) {
+        AdvancementProgress progress = player.getAdvancementProgress(advancement);
+        if (!progress.isDone()) {
+            return Optional.empty();
+        }
+
+        AdvancementDisplay display = advancement.getDisplay();
         if (display == null) {
-            feedback.send(sender, "報酬対象外の実績です: " + target.getKey());
-            return true;
+            return Optional.empty();
         }
 
         AdvancementDisplay.Frame frame = display.frame();
         BigDecimal reward = rewardFor(frame);
         if (reward.signum() <= 0) {
-            feedback.send(sender, "この実績レベルの報酬は無効です: " + frame.name().toLowerCase(Locale.ROOT));
-            return true;
+            return Optional.empty();
         }
-
-        feedback.handle(sender, store.claimQuestReward(player.getName(), target.getKey().asString(), frame.name(), reward));
-        return true;
+        return Optional.of(new QuestReward(advancement.getKey().asString(), frame.name(), reward));
     }
 
     private Optional<Advancement> resolveAdvancement(String rawId) {
@@ -121,6 +149,6 @@ public final class QuestCommand implements CommandExecutor {
     }
 
     private void usage(CommandSender sender) {
-        feedback.send(sender, "§e/quest claim [実績ID] §7例: §e/quest claim mine_stone");
+        feedback.send(sender, "§e/quest claim [実績ID] §7または §e/quest claim §7で全解除済み実績を一括受取");
     }
 }
