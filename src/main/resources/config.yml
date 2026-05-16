@@ -11,6 +11,12 @@ daily-login-bonus:
   enabled: true
   amount: "100"
   timezone: "Asia/Tokyo"
+
+quest:
+  rewards:
+    task: "100"
+    goal: "500"
+    challenge: "1000"
   
 company:
   capital: 100000

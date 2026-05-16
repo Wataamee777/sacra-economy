@@ -113,7 +113,7 @@ public final class MySqlEconomyStore implements AutoCloseable {
                         CREATE TABLE IF NOT EXISTS ec_operation_logs (
                             id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                             actor_mcid VARCHAR(32) NOT NULL,
-                            target_mcid VARCHAR(64) NULL,
+                            target_mcid VARCHAR(128) NULL,
                             action VARCHAR(64) NOT NULL,
                             amount DECIMAL(19,2) NULL,
                             reason VARCHAR(255) NOT NULL DEFAULT '理由なし',
@@ -123,7 +123,18 @@ public final class MySqlEconomyStore implements AutoCloseable {
                             INDEX idx_ec_operation_logs_action (action)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                         """);
-                statement.executeUpdate("ALTER TABLE ec_operation_logs MODIFY target_mcid VARCHAR(64) NULL");
+                statement.executeUpdate("ALTER TABLE ec_operation_logs MODIFY target_mcid VARCHAR(128) NULL");
+                statement.executeUpdate("""
+                        CREATE TABLE IF NOT EXISTS ec_quest_claims (
+                            mcid VARCHAR(32) NOT NULL,
+                            advancement_key VARCHAR(128) NOT NULL,
+                            level VARCHAR(16) NOT NULL,
+                            reward DECIMAL(19,2) NOT NULL,
+                            claimed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (mcid, advancement_key),
+                            INDEX idx_ec_quest_claims_mcid (mcid)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                        """);
             }
             ensureAccountSync(GOVERNMENT_WALLET);
         });
@@ -340,6 +351,27 @@ public final class MySqlEconomyStore implements AutoCloseable {
                 upsert.executeUpdate();
             }
             return true;
+        }));
+    }
+
+    public CompletableFuture<CommandResult> claimQuestReward(String mcid, String advancementKey, String level, BigDecimal reward) {
+        return supply(() -> inTransaction(connection -> {
+            ensureAccountSync(connection, mcid);
+            try (PreparedStatement insert = connection.prepareStatement("""
+                    INSERT IGNORE INTO ec_quest_claims (mcid, advancement_key, level, reward)
+                    VALUES (?, ?, ?, ?)
+                    """)) {
+                insert.setString(1, mcid);
+                insert.setString(2, advancementKey);
+                insert.setString(3, level);
+                insert.setBigDecimal(4, reward);
+                if (insert.executeUpdate() == 0) {
+                    return CommandResult.error("この実績報酬は既に受け取り済みです: " + advancementKey);
+                }
+            }
+            addBalance(connection, mcid, reward);
+            insertOperationLog(connection, "SYSTEM", mcid, "QUEST_CLAIM", reward, "実績報酬: %s (%s)".formatted(advancementKey, level));
+            return CommandResult.ok("実績報酬 %s円 を受け取りました。実績: %s / レベル: %s".formatted(format(reward), advancementKey, level.toLowerCase(java.util.Locale.ROOT)));
         }));
     }
 
