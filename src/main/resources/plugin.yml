@@ -14,7 +14,7 @@ commands:
     usage: /license buy <1-5>
   money:
     description: Economy transfer, ranking, and giveaway commands.
-    usage: /money <pay|rank|giveaway>
+    usage: /money <pay|rank|ranking|history|giveaway>
   admin:
-    description: SacraEconomy operator commands.
-    usage: /admin <money|company>
+    description: SacraEconomy administrator commands.
+    usage: /admin <money|company|code>

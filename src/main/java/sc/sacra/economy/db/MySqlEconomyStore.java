@@ -7,6 +7,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import sc.sacra.economy.model.CommandResult;
 import sc.sacra.economy.model.Company;
 import sc.sacra.economy.model.LicenseCategory;
+import sc.sacra.economy.model.OperationLogEntry;
 import sc.sacra.economy.model.RankEntry;
 
 import java.math.BigDecimal;
@@ -17,31 +18,29 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MySqlEconomyStore implements AutoCloseable {
+    public static final String GOVERNMENT_WALLET = "Government_Wallet";
+    public static final BigDecimal COMPANY_CAPITAL = money("100000");
+    public static final BigDecimal COMPANY_TAX = money("1000");
+    public static final BigDecimal COMPANY_TOTAL_COST = COMPANY_CAPITAL.add(COMPANY_TAX);
+    public static final BigDecimal LICENSE_COMPANY_DISCOUNT = new BigDecimal("0.90");
+    private static final String DEFAULT_REASON = "理由なし";
+    private static final char[] CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
+
     private final HikariDataSource dataSource;
     private final ExecutorService executor;
-
-    // 設定値はインスタンス変数として管理（プラグインのリロードに対応しやすいため）
-    public final String GOVERNMENT_WALLET = "Government_Wallet";
-    public final BigDecimal COMPANY_CAPITAL;
-    public final BigDecimal COMPANY_TAX;
-    public final BigDecimal COMPANY_TOTAL_COST;
-    public final BigDecimal LICENSE_COMPANY_DISCOUNT = new BigDecimal("0.90");
+    private final SecureRandom random = new SecureRandom();
 
     public MySqlEconomyStore(JavaPlugin plugin) {
         FileConfiguration config = plugin.getConfig();
-
-        // 数値の初期化
-        this.COMPANY_CAPITAL = money(config.getInt("company.capital", 100000));
-        this.COMPANY_TAX = money(config.getInt("company.tax", 1000));
-        this.COMPANY_TOTAL_COST = COMPANY_CAPITAL.add(COMPANY_TAX);
-
-        // HikariCPの設定
         String host = config.getString("mysql.host", "localhost");
         int port = config.getInt("mysql.port", 3306);
         String database = config.getString("mysql.database", "minecraft");
@@ -55,16 +54,7 @@ public final class MySqlEconomyStore implements AutoCloseable {
         hikari.setPassword(config.getString("mysql.password", ""));
         hikari.setMaximumPoolSize(config.getInt("mysql.pool-size", 10));
         hikari.setPoolName("SacraEconomyPool");
-
-        // 接続の初期化
-        try {
-            this.dataSource = new HikariDataSource(hikari);
-        } catch (Exception e) {
-            plugin.getLogger().severe("データベース接続に失敗しました。設定を確認してください。");
-            throw e;
-        }
-
-        // 非同期処理用スレッドプール
+        this.dataSource = new HikariDataSource(hikari);
         this.executor = Executors.newFixedThreadPool(Math.max(2, config.getInt("mysql.pool-size", 10)), runnable -> {
             Thread thread = new Thread(runnable, "SacraEconomy-DB");
             thread.setDaemon(true);
@@ -119,6 +109,21 @@ public final class MySqlEconomyStore implements AutoCloseable {
                             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                         """);
+                statement.executeUpdate("""
+                        CREATE TABLE IF NOT EXISTS ec_operation_logs (
+                            id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                            actor_mcid VARCHAR(32) NOT NULL,
+                            target_mcid VARCHAR(64) NULL,
+                            action VARCHAR(64) NOT NULL,
+                            amount DECIMAL(19,2) NULL,
+                            reason VARCHAR(255) NOT NULL DEFAULT '理由なし',
+                            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            INDEX idx_ec_operation_logs_actor (actor_mcid),
+                            INDEX idx_ec_operation_logs_target (target_mcid),
+                            INDEX idx_ec_operation_logs_action (action)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                        """);
+                statement.executeUpdate("ALTER TABLE ec_operation_logs MODIFY target_mcid VARCHAR(64) NULL");
             }
             ensureAccountSync(GOVERNMENT_WALLET);
         });
@@ -147,6 +152,7 @@ public final class MySqlEconomyStore implements AutoCloseable {
             }
             addBalance(connection, from, amount.negate());
             addBalance(connection, to, amount);
+            insertOperationLog(connection, from, to, "PLAYER_PAY", amount, "プレイヤー送金");
             return CommandResult.ok("%s に %s円を送金しました。".formatted(to, format(amount)));
         }));
     }
@@ -155,10 +161,19 @@ public final class MySqlEconomyStore implements AutoCloseable {
         return supply(() -> inTransaction(connection -> {
             ensureAccountSync(connection, mcid);
             addBalance(connection, mcid, amount);
+            insertOperationLog(connection, "SYSTEM", mcid, "VAULT_DEPOSIT", amount, "Vault入金");
             return CommandResult.ok("%s の口座に %s円を追加しました。".formatted(mcid, format(amount)));
         }));
     }
 
+    public CompletableFuture<CommandResult> adminAddMoney(String actor, String mcid, BigDecimal amount, String reason) {
+        return supply(() -> inTransaction(connection -> {
+            ensureAccountSync(connection, mcid);
+            addBalance(connection, mcid, amount);
+            insertOperationLog(connection, actor, mcid, "ADMIN_MONEY_ADD", amount, normalizeReason(reason));
+            return CommandResult.ok("%s の口座に %s円を追加しました。名目: %s".formatted(mcid, format(amount), normalizeReason(reason)));
+        }));
+    }
 
     public CompletableFuture<CommandResult> withdrawMoney(String mcid, BigDecimal amount) {
         return supply(() -> inTransaction(connection -> {
@@ -168,22 +183,22 @@ public final class MySqlEconomyStore implements AutoCloseable {
                 return CommandResult.error("所持金が足りません。");
             }
             addBalance(connection, mcid, amount.negate());
+            insertOperationLog(connection, "SYSTEM", mcid, "VAULT_WITHDRAW", amount, "Vault出金");
             return CommandResult.ok("%s の口座から %s円を引き落としました。".formatted(mcid, format(amount)));
         }));
     }
 
-    public CompletableFuture<CommandResult> deleteAccount(String mcid) {
-        return supply(() -> {
-            if (GOVERNMENT_WALLET.equalsIgnoreCase(mcid)) {
-                return CommandResult.error("国庫口座は削除できません。");
+    public CompletableFuture<CommandResult> adminRemoveMoney(String actor, String mcid, BigDecimal amount, String reason) {
+        return supply(() -> inTransaction(connection -> {
+            ensureAccountSync(connection, mcid);
+            BigDecimal balance = lockedBalance(connection, mcid);
+            if (balance.compareTo(amount) < 0) {
+                return CommandResult.error("%s の残高が足りません。現在残高: %s円".formatted(mcid, format(balance)));
             }
-            try (Connection connection = dataSource.getConnection();
-                 PreparedStatement statement = connection.prepareStatement("DELETE FROM ec_accounts WHERE mcid = ?")) {
-                statement.setString(1, mcid);
-                statement.executeUpdate();
-                return CommandResult.ok("%s の口座データを削除しました。".formatted(mcid));
-            }
-        });
+            addBalance(connection, mcid, amount.negate());
+            insertOperationLog(connection, actor, mcid, "ADMIN_MONEY_REMOVE", amount, normalizeReason(reason));
+            return CommandResult.ok("%s の口座から %s円を削除しました。名目: %s".formatted(mcid, format(amount), normalizeReason(reason)));
+        }));
     }
 
     public CompletableFuture<CommandResult> createCompany(String president, String companyName) {
@@ -200,6 +215,7 @@ public final class MySqlEconomyStore implements AutoCloseable {
             ensureAccountSync(connection, GOVERNMENT_WALLET);
             addBalance(connection, GOVERNMENT_WALLET, COMPANY_TAX);
             insertCompany(connection, president, companyName, COMPANY_CAPITAL);
+            insertOperationLog(connection, president, companyName, "COMPANY_CREATE", COMPANY_TOTAL_COST, "会社設立");
             return CommandResult.ok("会社 %s を設立しました。資本金: %s円 / 設立税: %s円".formatted(companyName, format(COMPANY_CAPITAL), format(COMPANY_TAX)));
         }));
     }
@@ -210,6 +226,7 @@ public final class MySqlEconomyStore implements AutoCloseable {
                 return CommandResult.error("その会社名は既に使われています。");
             }
             insertCompany(connection, president, companyName, BigDecimal.ZERO.setScale(2));
+            insertOperationLog(connection, "ADMIN", companyName, "ADMIN_COMPANY_ADD", BigDecimal.ZERO.setScale(2), "管理者による会社設立");
             return CommandResult.ok("会社 %s を強制設立しました。社長: %s".formatted(companyName, president));
         }));
     }
@@ -249,9 +266,35 @@ public final class MySqlEconomyStore implements AutoCloseable {
                 statement.setBigDecimal(4, price);
                 statement.executeUpdate();
             }
+            insertOperationLog(connection, mcid, GOVERNMENT_WALLET, "LICENSE_BUY", price, "%d類営業許可".formatted(category.id()));
             String discount = president ? "（会社社長割引10%OFF適用）" : "";
             return CommandResult.ok("%d類（%s）の営業許可を %s円 で購入しました%s。".formatted(category.id(), category.label(), format(price), discount));
         }));
+    }
+
+    public CompletableFuture<List<RankEntry>> topRankings(int limit) {
+        return supply(() -> {
+            List<RankEntry> rankings = new ArrayList<>();
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement statement = connection.prepareStatement("""
+                         SELECT mcid, balance, position FROM (
+                             SELECT mcid, balance, DENSE_RANK() OVER (ORDER BY balance DESC) AS position
+                             FROM ec_accounts
+                             WHERE mcid <> ?
+                         ) ranked
+                         WHERE position <= ?
+                         ORDER BY position ASC, balance DESC, mcid ASC
+                         """)) {
+                statement.setString(1, GOVERNMENT_WALLET);
+                statement.setInt(2, limit);
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        rankings.add(new RankEntry(result.getString("mcid"), result.getBigDecimal("balance"), result.getLong("position")));
+                    }
+                }
+            }
+            return rankings;
+        });
     }
 
     public CompletableFuture<Optional<RankEntry>> rankOf(String mcid) {
@@ -287,6 +330,7 @@ public final class MySqlEconomyStore implements AutoCloseable {
                 }
             }
             addBalance(connection, mcid, amount);
+            insertOperationLog(connection, "SYSTEM", mcid, "DAILY_LOGIN_BONUS", amount, "デイリーログインボーナス");
             try (PreparedStatement upsert = connection.prepareStatement("""
                     INSERT INTO ec_daily_bonuses (mcid, last_claim_date) VALUES (?, ?)
                     ON DUPLICATE KEY UPDATE last_claim_date = VALUES(last_claim_date)
@@ -296,6 +340,19 @@ public final class MySqlEconomyStore implements AutoCloseable {
                 upsert.executeUpdate();
             }
             return true;
+        }));
+    }
+
+    public CompletableFuture<CommandResult> createGiveawayCode(String actor, BigDecimal amount, String reason) {
+        return supply(() -> inTransaction(connection -> {
+            String code = uniqueCode(connection);
+            try (PreparedStatement statement = connection.prepareStatement("INSERT INTO ec_codes (code, reward, enabled) VALUES (?, ?, TRUE)")) {
+                statement.setString(1, code);
+                statement.setBigDecimal(2, amount);
+                statement.executeUpdate();
+            }
+            insertOperationLog(connection, actor, code, "ADMIN_CODE_SET", amount, normalizeReason(reason));
+            return CommandResult.ok("Giveawayコード %s を発行しました。報酬: %s円 / 名目: %s".formatted(code, format(amount), normalizeReason(reason)));
         }));
     }
 
@@ -318,10 +375,42 @@ public final class MySqlEconomyStore implements AutoCloseable {
                         update.setString(2, code);
                         update.executeUpdate();
                     }
+                    insertOperationLog(connection, mcid, code, "GIVEAWAY_REDEEM", reward, "Giveawayコード使用");
                     return CommandResult.ok("Giveawayコードを使用し、%s円 を受け取りました。".formatted(format(reward)));
                 }
             }
         }));
+    }
+
+    public CompletableFuture<List<OperationLogEntry>> historyOf(String mcid, int limit) {
+        return supply(() -> {
+            List<OperationLogEntry> history = new ArrayList<>();
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement statement = connection.prepareStatement("""
+                         SELECT id, actor_mcid, target_mcid, action, amount, reason, created_at
+                         FROM ec_operation_logs
+                         WHERE actor_mcid = ? OR target_mcid = ?
+                         ORDER BY created_at DESC, id DESC
+                         LIMIT ?
+                         """)) {
+                statement.setString(1, mcid);
+                statement.setString(2, mcid);
+                statement.setInt(3, limit);
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        history.add(new OperationLogEntry(
+                                result.getLong("id"),
+                                result.getString("actor_mcid"),
+                                result.getString("target_mcid"),
+                                result.getString("action"),
+                                result.getBigDecimal("amount"),
+                                result.getString("reason"),
+                                result.getTimestamp("created_at").toLocalDateTime()));
+                    }
+                }
+            }
+            return history;
+        });
     }
 
     public CompletableFuture<Boolean> hasAccount(String mcid) {
@@ -436,6 +525,57 @@ public final class MySqlEconomyStore implements AutoCloseable {
             statement.setBigDecimal(3, balance);
             statement.executeUpdate();
         }
+    }
+
+    private String uniqueCode(Connection connection) throws SQLException {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            String code = randomCode();
+            try (PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM ec_codes WHERE code = ?")) {
+                statement.setString(1, code);
+                try (ResultSet result = statement.executeQuery()) {
+                    if (!result.next()) {
+                        return code;
+                    }
+                }
+            }
+        }
+        throw new SQLException("Giveawayコードの生成に失敗しました。");
+    }
+
+    private String randomCode() {
+        StringBuilder builder = new StringBuilder("SACRA-");
+        for (int index = 0; index < 12; index++) {
+            if (index > 0 && index % 4 == 0) {
+                builder.append('-');
+            }
+            builder.append(CODE_ALPHABET[random.nextInt(CODE_ALPHABET.length)]);
+        }
+        return builder.toString();
+    }
+
+    private void insertOperationLog(Connection connection, String actor, String target, String action, BigDecimal amount, String reason) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO ec_operation_logs (actor_mcid, target_mcid, action, amount, reason)
+                VALUES (?, ?, ?, ?, ?)
+                """)) {
+            statement.setString(1, normalizeActor(actor));
+            statement.setString(2, target);
+            statement.setString(3, action);
+            statement.setBigDecimal(4, amount);
+            statement.setString(5, normalizeReason(reason));
+            statement.executeUpdate();
+        }
+    }
+
+    private String normalizeActor(String actor) {
+        return actor == null || actor.isBlank() ? "SYSTEM" : actor;
+    }
+
+    private String normalizeReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return DEFAULT_REASON;
+        }
+        return reason.length() <= 255 ? reason : reason.substring(0, 255);
     }
 
     private <T> T inTransaction(SqlCallable<T> callable) throws SQLException {
