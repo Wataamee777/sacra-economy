@@ -448,6 +448,10 @@ public final class MySqlEconomyStore implements AutoCloseable {
         });
     }
 
+    public static BigDecimal money(int value) {
+        return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
+    }
+    
     public static BigDecimal money(String text) {
         return new BigDecimal(text).setScale(2, RoundingMode.HALF_UP);
     }
@@ -613,10 +617,10 @@ public final class MySqlEconomyStore implements AutoCloseable {
 
     @Override
     public void close() {
-        executor.shutdownNow();
-        dataSource.close();
+        if (executor != null) executor.shutdown();
+        if (dataSource != null) dataSource.close();
     }
-
+    
     @FunctionalInterface
     private interface SqlCallable<T> {
         T call(Connection connection) throws SQLException;
