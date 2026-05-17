@@ -1,0 +1,28 @@
+name: SacraEconomy
+version: '1.0.0'
+main: sc.sacra.economy.SacraEconomyPlugin
+api-version: '1.21'
+depend: [Vault]
+author: Sacra
+commands:
+  company:
+    description: Company creation and deletion commands.
+    usage: /company <new|del> <会社名>
+  license:
+    description: Business license commands.
+    usage: /license buy <1-5>
+  money:
+    description: Economy transfer, ranking, and giveaway commands.
+    usage: /money <pay|rank|ranking|history|giveaway>
+  quest:
+    description: Advancement quest reward commands.
+    usage: /quest claim [実績ID]
+  shop:
+    description: Open the server shop GUI.
+    usage: /shop
+  trade:
+    description: Request a safe player trade.
+    usage: /trade <プレイヤー名>
+  admin:
+    description: SacraEconomy administrator commands.
+    usage: /admin <money|company|code>

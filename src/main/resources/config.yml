@@ -1,0 +1,38 @@
+mysql:
+  host: "localhost"
+  port: 3306
+  database: "minecraft"
+  username: "root"
+  password: "password"
+  useSSL: false
+  pool-size: 10
+
+
+daily-login-bonus:
+  enabled: true
+  amount: "100"
+  timezone: "Asia/Tokyo"
+
+quest:
+  rewards:
+    task: "100"
+    goal: "500"
+    challenge: "1000"
+
+block-rewards:
+  break:
+    STONE: "0.5"
+    DIAMOND_ORE: "100.0"
+    DEEPSLATE_DIAMOND_ORE: "100.0"
+    COAL_ORE: "2.0"
+    IRON_ORE: "5.0"
+    GOLD_ORE: "10.0"
+
+shop:
+  sell-prices:
+    COBBLESTONE: "0.1"
+    STONE: "0.1"
+    COAL: "1.0"
+    RAW_IRON: "3.0"
+    RAW_GOLD: "5.0"
+    DIAMOND: "50.0"
