@@ -5,7 +5,7 @@
 
     <groupId>sc.sacra</groupId>
     <artifactId>sacra-economy</artifactId>
-    <version>1.6.0</version>
+    <version>1.7.0</version>
     <packaging>jar</packaging>
 
     <name>SacraEconomy</name>
@@ -39,6 +39,11 @@
             <artifactId>VaultAPI</artifactId>
             <version>1.7.1</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.WoblexGS</groupId>
+            <artifactId>QualityArmors</artifactId>
+            <version>2.0.4</version> <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.zaxxer</groupId>
