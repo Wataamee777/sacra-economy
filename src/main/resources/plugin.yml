@@ -18,6 +18,12 @@ commands:
   quest:
     description: Advancement quest reward commands.
     usage: /quest claim [実績ID]
+  shop:
+    description: Open the server shop GUI.
+    usage: /shop
+  trade:
+    description: Request a safe player trade.
+    usage: /trade <プレイヤー名>
   admin:
     description: SacraEconomy administrator commands.
     usage: /admin <money|company|code>

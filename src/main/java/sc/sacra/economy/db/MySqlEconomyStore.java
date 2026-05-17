@@ -178,6 +178,16 @@ public final class MySqlEconomyStore implements AutoCloseable {
         }));
     }
 
+
+    public CompletableFuture<CommandResult> addSystemReward(String mcid, BigDecimal amount, String action, String reason) {
+        return supply(() -> inTransaction(connection -> {
+            ensureAccountSync(connection, mcid);
+            addBalance(connection, mcid, amount);
+            insertOperationLog(connection, "SYSTEM", mcid, action, amount, reason);
+            return CommandResult.ok("%s円を受け取りました。".formatted(format(amount)));
+        }));
+    }
+
     public CompletableFuture<CommandResult> adminAddMoney(String actor, String mcid, BigDecimal amount, String reason) {
         return supply(() -> inTransaction(connection -> {
             ensureAccountSync(connection, mcid);

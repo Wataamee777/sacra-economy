@@ -9,6 +9,8 @@ import sc.sacra.economy.command.CompanyCommand;
 import sc.sacra.economy.command.LicenseCommand;
 import sc.sacra.economy.command.MoneyCommand;
 import sc.sacra.economy.command.QuestCommand;
+import sc.sacra.economy.command.ShopCommand;
+import sc.sacra.economy.command.TradeCommand;
 import sc.sacra.economy.command.AdminCommand;
 import sc.sacra.economy.db.MySqlEconomyStore;
 import sc.sacra.economy.vault.SacraVaultEconomy;
@@ -22,11 +24,14 @@ public final class SacraEconomyPlugin extends JavaPlugin {
         saveDefaultConfig();
         store = new MySqlEconomyStore(this);
         CommandFeedback feedback = new CommandFeedback(this);
+        TradeCommand tradeCommand = new TradeCommand(this);
 
         registerCommand("company", new CompanyCommand(store, feedback));
         registerCommand("license", new LicenseCommand(store, feedback));
         registerCommand("money", new MoneyCommand(store, feedback));
         registerCommand("quest", new QuestCommand(this, store, feedback));
+        registerCommand("shop", new ShopCommand(this));
+        registerCommand("trade", tradeCommand);
         registerCommand("admin", new AdminCommand(store, feedback));
 
         store.initialize().whenComplete((ignored, throwable) -> Bukkit.getScheduler().runTask(this, () -> {
@@ -38,6 +43,9 @@ public final class SacraEconomyPlugin extends JavaPlugin {
             vaultEconomy = new SacraVaultEconomy(store);
             getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Highest);
             getServer().getPluginManager().registerEvents(new DailyLoginBonusListener(this, store, feedback), this);
+            getServer().getPluginManager().registerEvents(new BlockEarningListener(this, store), this);
+            getServer().getPluginManager().registerEvents(new ShopListener(this, store, feedback), this);
+            getServer().getPluginManager().registerEvents(tradeCommand, this);
             getLogger().info("SacraEconomy has been enabled as the Vault economy provider.");
         }));
     }
