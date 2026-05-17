@@ -4,7 +4,9 @@ main: sc.sacra.economy.SacraEconomyPlugin
 api-version: '1.21'
 description: '${project.description}'
 depend: [Vault]
-author: Sacra
+# 👇 【重要】QualityArmorsがサーバーにある場合、先に読み込んでもらう設定
+softdepend: [QualityArmors]
+author: Sacra,wataamee777
 commands:
   company:
     description: Company creation and deletion commands.
@@ -26,4 +28,4 @@ commands:
     usage: /trade <プレイヤー名>
   admin:
     description: SacraEconomy administrator commands.
-    usage: /admin <money|company|code>
+    usage: /admin <money|company|code|shop>
