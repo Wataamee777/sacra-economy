@@ -1,6 +1,6 @@
 package sc.sacra.economy;
 
-import cz.woblex.qualityarmors.api.QualityArmors;
+import me.zombie_striker.qg.api.QualityArmory;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.entity.Player;
