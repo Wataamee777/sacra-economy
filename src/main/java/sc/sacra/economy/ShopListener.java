@@ -20,13 +20,13 @@ public final class ShopListener implements Listener {
     private final JavaPlugin plugin;
     private final MySqlEconomyStore store;
     private final CommandFeedback feedback;
-    private final boolean hasQualityArmors;
+    private final boolean hasQualityArmory;
 
     public ShopListener(JavaPlugin plugin, MySqlEconomyStore store, CommandFeedback feedback) {
         this.plugin = plugin;
         this.store = store;
         this.feedback = feedback;
-        this.hasQualityArmors = plugin.getServer().getPluginManager().isPluginEnabled("QualityArmors");
+        this.hasQualityArmory = plugin.getServer().getPluginManager().isPluginEnabled("QualityArmory");
     }
 
     @EventHandler
@@ -134,20 +134,20 @@ public final class ShopListener implements Listener {
     }
 
     private String getItemIdentifier(ItemStack item) {
-        if (hasQualityArmors) {
-            if (QualityArmors.isGun(item)) return "QA_" + QualityArmors.getGunObject(item).getName();
-            if (QualityArmors.isArmor(item)) return "QA_" + QualityArmors.getArmorObject(item).getName();
+        if (hasQualityArmory) {
+            if (QualityArmory.isGun(item)) return "QA_" + QualityArmory.getGunObject(item).getName();
+            if (QualityArmory.isArmor(item)) return "QA_" + QualityArmory.getArmorObject(item).getName();
         }
         return item.getType().name();
     }
 
     private BigDecimal calculateBasePrice(ItemStack item) {
-        if (hasQualityArmors) {
-            if (QualityArmors.isGun(item)) {
-                return BigDecimal.valueOf(Math.max(0, QualityArmors.getGunObject(item).getPrice() - 100.0));
+        if (hasQualityArmory) {
+            if (QualityArmory.isGun(item)) {
+                return BigDecimal.valueOf(Math.max(0, QualityArmory.getGunObject(item).getPrice() - 100.0));
             }
-            if (QualityArmors.isArmor(item)) {
-                return BigDecimal.valueOf(Math.max(0, QualityArmors.getArmorObject(item).getPrice() - 100.0));
+            if (QualityArmory.isArmor(item)) {
+                return BigDecimal.valueOf(Math.max(0, QualityArmory.getArmorObject(item).getPrice() - 100.0));
             }
         }
 
@@ -163,7 +163,7 @@ public final class ShopListener implements Listener {
     }
 
     private ItemGenre detectGenre(ItemStack item) {
-        if (hasQualityArmors && (QualityArmors.isGun(item) || QualityArmors.isArmor(item))) {
+        if (hasQualityArmory && (QualityArmory.isGun(item) || QualityArmory.isArmor(item))) {
             return ItemGenre.QUALITY_ARMORS;
         }
 
