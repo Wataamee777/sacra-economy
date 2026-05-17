@@ -7,7 +7,6 @@ mysql:
   useSSL: false
   pool-size: 10
 
-
 daily-login-bonus:
   enabled: true
   amount: "100"
@@ -36,3 +35,7 @@ shop:
     RAW_IRON: "3.0"
     RAW_GOLD: "5.0"
     DIAMOND: "50.0"
+  
+company:
+  capital: 100000
+  tax: 1000
