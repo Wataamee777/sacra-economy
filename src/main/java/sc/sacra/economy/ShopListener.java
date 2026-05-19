@@ -1,6 +1,6 @@
 package sc.sacra.economy;
 
-import me.zombie_striker.qg.api.QualityArmory;
+// import me.zombie_striker.qg.api.QualityArmory;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.entity.Player;
@@ -26,7 +26,7 @@ public final class ShopListener implements Listener {
         this.plugin = plugin;
         this.store = store;
         this.feedback = feedback;
-        this.hasQualityArmory = plugin.getServer().getPluginManager().isPluginEnabled("QualityArmory");
+       // this.hasQualityArmory = plugin.getServer().getPluginManager().isPluginEnabled("QualityArmory");
     }
 
     @EventHandler
@@ -134,10 +134,10 @@ public final class ShopListener implements Listener {
     }
 
     private String getItemIdentifier(ItemStack item) {
-        if (hasQualityArmory) {
+        /* if (hasQualityArmory) {
             if (QualityArmory.isGun(item)) return "QA_" + QualityArmory.getGunObject(item).getName();
             if (QualityArmory.isArmor(item)) return "QA_" + QualityArmory.getArmorObject(item).getName();
-        }
+        }*/
         return item.getType().name();
     }
 
