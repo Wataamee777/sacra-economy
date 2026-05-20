@@ -141,15 +141,15 @@ public final class ShopListener implements Listener {
         return item.getType().name();
     }
 
-    private BigDecimal calculateBasePrice(ItemStack item) {
-        if (hasQualityArmory) {
+     private BigDecimal calculateBasePrice(ItemStack item) {
+        /* if (hasQualityArmory) {
             if (QualityArmory.isGun(item)) {
-                return BigDecimal.valueOf(Math.max(0, QualityArmory.getGunObject(item).getPrice() - 100.0));
+        return BigDecimal.valueOf(Math.max(0, QualityArmory.getGunObject(item).getPrice() - 100.0));
             }
             if (QualityArmory.isArmor(item)) {
                 return BigDecimal.valueOf(Math.max(0, QualityArmory.getArmorObject(item).getPrice() - 100.0));
             }
-        }
+        }*/
 
         // バニラアイテムの規定最高値（※環境に合わせて自由に変更、または外部configから呼ぶ形にしてください）
         Material mat = item.getType();
@@ -163,9 +163,9 @@ public final class ShopListener implements Listener {
     }
 
     private ItemGenre detectGenre(ItemStack item) {
-        if (hasQualityArmory && (QualityArmory.isGun(item) || QualityArmory.isArmor(item))) {
+        /*if (hasQualityArmory && (QualityArmory.isGun(item) || QualityArmory.isArmor(item))) {
             return ItemGenre.QUALITY_ARMORS;
-        }
+        }*/
 
         Material mat = item.getType();
         if (mat.name().contains("ORE") || mat.name().contains("INGOT") || mat == Material.DIAMOND || mat == Material.EMERALD) {
@@ -213,7 +213,7 @@ public final class ShopListener implements Listener {
      * ジャンルごとの経済パラメータ定義
      */
     public enum ItemGenre {
-        QUALITY_ARMORS("特製武具", 300, 10, 150),      // 武具: 流通が少ないためすぐ価格が落ちる
+        // QUALITY_ARMORS("特製武具", 300, 10, 150),      // 武具: 流通が少ないためすぐ価格が落ちる
         MINERAL("鉱石素材", 2000, 500, 30000),         // 鉱石: 500個まで序盤ボーナス、3万個（トラップ化）でペナルティ
         FARM("農作物・食料", 8000, 1000, 100000),      // 農業: 自動化しやすいため許容量を高めに設定
         BUILDING("建築ブロック", 20000, 2000, 500000), // 建築: 超大量に出回る前提のバランス
