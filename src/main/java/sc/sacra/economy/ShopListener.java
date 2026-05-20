@@ -26,7 +26,7 @@ public final class ShopListener implements Listener {
         this.plugin = plugin;
         this.store = store;
         this.feedback = feedback;
-       // this.hasQualityArmory = plugin.getServer().getPluginManager().isPluginEnabled("QualityArmory");
+        this.hasQualityArmory = plugin.getServer().getPluginManager().isPluginEnabled("QualityArmory");
     }
 
     @EventHandler
