@@ -3,9 +3,8 @@ version: '${project.version}'
 main: sc.sacra.economy.SacraEconomyPlugin
 api-version: '1.21'
 description: '${project.description}'
-depend: [Vault,QualityArmory]
-# 👇 【重要】QualityArmorsがサーバーにある場合、先に読み込んでもらう設定
-softdepend: [QualityArmors]
+depend: [Vault]
+softdepend: [Vault]
 author: Sacra,wataamee777
 commands:
   company:
