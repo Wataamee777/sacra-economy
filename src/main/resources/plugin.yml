@@ -1,9 +1,11 @@
 name: SacraEconomy
-version: '1.0.0'
+version: '${project.version}'
 main: sc.sacra.economy.SacraEconomyPlugin
 api-version: '1.21'
+description: '${project.description}'
 depend: [Vault]
-author: Sacra
+softdepend: [Vault]
+author: Sacra,wataamee777
 commands:
   company:
     description: Company creation and deletion commands.

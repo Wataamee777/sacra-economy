@@ -1,16 +1,19 @@
 package sc.sacra.economy;
 
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Material;
+import org.bukkit.Tag;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.inventory.Inventory;
+// import me.zombie_striker.qg.api.QualityArmory;
 import sc.sacra.economy.command.ShopCommand;
 import sc.sacra.economy.db.MySqlEconomyStore;
 
@@ -27,15 +30,17 @@ public final class ShopListener implements Listener {
             27, 28, 29, 30, 31, 32, 33, 34, 35,
             36, 37, 38, 39, 40, 41, 42, 43, 44
     );
-
+  
     private final JavaPlugin plugin;
     private final MySqlEconomyStore store;
     private final CommandFeedback feedback;
-
+    private final boolean hasQualityArmory;
+    
     public ShopListener(JavaPlugin plugin, MySqlEconomyStore store, CommandFeedback feedback) {
         this.plugin = plugin;
         this.store = store;
         this.feedback = feedback;
+        this.hasQualityArmory = plugin.getServer().getPluginManager().isPluginEnabled("QualityArmory");
     }
 
     @EventHandler
