@@ -11,17 +11,15 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public final class ShopCommand implements CommandExecutor {
     public static final String TITLE = "サーバーショップ";
-    private final JavaPlugin plugin;
-
-    public ShopCommand(JavaPlugin plugin) {
-        this.plugin = plugin;
-    }
+    public static final int SIZE = 54;
+    public static final int CONFIRM_SLOT = 45;
+    public static final int CANCEL_SLOT = 53;
+    public static final int INFO_SLOT = 49;
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String @NotNull [] args) {
@@ -29,39 +27,19 @@ public final class ShopCommand implements CommandExecutor {
             sender.sendMessage("このコマンドはプレイヤーのみ実行できます。");
             return true;
         }
-        Inventory inventory = Bukkit.createInventory(player, 9, TITLE);
-        List<Material> materials = sellableMaterials();
-        for (int slot = 0; slot < Math.min(9, materials.size()); slot++) {
-            inventory.setItem(slot, displayItem(materials.get(slot)));
-        }
+        Inventory inventory = Bukkit.createInventory(player, SIZE, TITLE);
+        inventory.setItem(CONFIRM_SLOT, button(Material.GREEN_WOOL, "§a売却確定", "§7投入したアイテムを全て売却"));
+        inventory.setItem(CANCEL_SLOT, button(Material.RED_WOOL, "§cキャンセル", "§7投入アイテムを返却して閉じる"));
+        inventory.setItem(INFO_SLOT, button(Material.BOOK, "§e売却ガイド", "§7上段5行に売りたいアイテムを置いてください", "§7価格設定は config.yml の shop.sell-prices です"));
         player.openInventory(inventory);
         return true;
     }
 
-    private List<Material> sellableMaterials() {
-        List<Material> materials = new ArrayList<>();
-        var section = plugin.getConfig().getConfigurationSection("shop.sell-prices");
-        if (section == null) {
-            materials.add(Material.COBBLESTONE);
-            return materials;
-        }
-        for (String key : section.getKeys(false)) {
-            Material material = Material.matchMaterial(key);
-            if (material != null && material.isItem()) {
-                materials.add(material);
-            }
-        }
-        if (!materials.contains(Material.COBBLESTONE)) {
-            materials.addFirst(Material.COBBLESTONE);
-        }
-        return materials;
-    }
-
-    private ItemStack displayItem(Material material) {
+    private ItemStack button(Material material, String name, String... lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName("§a" + material.name());
-        meta.setLore(List.of("§7クリックまたはシフトクリックで売却"));
+        meta.setDisplayName(name);
+        meta.setLore(List.of(lore));
         item.setItemMeta(meta);
         return item;
     }

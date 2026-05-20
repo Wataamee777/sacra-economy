@@ -27,4 +27,4 @@ commands:
     usage: /trade <プレイヤー名>
   admin:
     description: SacraEconomy administrator commands.
-    usage: /admin <money|company|code|shop>
+    usage: /admin <money|company|code>

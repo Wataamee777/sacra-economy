@@ -28,6 +28,10 @@ block-rewards:
     GOLD_ORE: "10.0"
 
 shop:
+  # QualityArmory 系アイテム価格設定は将来対応予定（保留）
+  # qualityarmory-prices:
+  #   QA_EXAMPLE_ITEM: "100.0"
+  default-sell-price: "0.1"
   sell-prices:
     COBBLESTONE: "0.1"
     STONE: "0.1"

@@ -136,16 +136,6 @@ public final class MySqlEconomyStore implements AutoCloseable {
                             INDEX idx_ec_quest_claims_mcid (mcid)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                         """);
-                
-                // 【新規追加】変動相場およびコマンド補正を一本化して管理するテーブル
-                statement.executeUpdate("""
-                        CREATE TABLE IF NOT EXISTS ec_item_market (
-                            item_id VARCHAR(64) NOT NULL PRIMARY KEY,
-                            sales_count INT NOT NULL DEFAULT 0,
-                            modifier DECIMAL(5,2) NOT NULL DEFAULT 1.00,
-                            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                        """);
             }
             ensureAccountSync(GOVERNMENT_WALLET);
         });
@@ -533,91 +523,10 @@ public final class MySqlEconomyStore implements AutoCloseable {
         });
     }
 
-    // ==========================================
-    //  👇 【新規拡張】市場相場・価格変動ロジック用メソッド
-    // ==========================================
-
-    /**
-     * アイテムの「累積売却数」と「運営補正倍率」をスレッド安全に1回で同時取得する
-     */
-    public CompletableFuture<SalesData> getSalesAndModifier(String itemId) {
-        return supply(() -> {
-            // 対象アイテムのレコードがまだ無ければ自動挿入、既にあれば取得するクエリ
-            String sql = """
-                SELECT sales_count, modifier FROM ec_item_market WHERE item_id = ?
-                """;
-            
-            try (Connection connection = dataSource.getConnection()) {
-                // 事前にデータが存在することを確認・同期
-                ensureItemMarketSync(connection, itemId);
-                
-                try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    statement.setString(1, itemId);
-                    try (ResultSet result = statement.executeQuery()) {
-                        if (result.next()) {
-                            return new SalesData(result.getInt("sales_count"), result.getBigDecimal("modifier"));
-                        }
-                    }
-                }
-            }
-            return new SalesData(0, BigDecimal.ONE.setScale(2));
-        });
-    }
-
-    /**
-     * プレイヤーの売却完了後、市場全体の累積数を追加する
-     */
-    public CompletableFuture<Void> addSalesCount(String itemId, int amount) {
-        return run(() -> {
-            String sql = "UPDATE ec_item_market SET sales_count = sales_count + ? WHERE item_id = ?";
-            try (Connection connection = dataSource.getConnection()) {
-                ensureItemMarketSync(connection, itemId);
-                try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    statement.setInt(1, amount);
-                    statement.setString(2, itemId);
-                    statement.executeUpdate();
-                }
-            }
-        });
-    }
-
-    /**
-     * 管理コマンドから運営補正倍率を直接書き換える (/admin shop price 用)
-     */
-    public CompletableFuture<Void> setPriceModifier(String itemId, BigDecimal modifier) {
-        return run(() -> {
-            String sql = """
-                INSERT INTO ec_item_market (item_id, sales_count, modifier) VALUES (?, 0, ?)
-                ON DUPLICATE KEY UPDATE modifier = VALUES(modifier)
-                """;
-            try (Connection connection = dataSource.getConnection();
-                 PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, itemId);
-                statement.setBigDecimal(2, modifier);
-                statement.executeUpdate();
-            }
-        });
-    }
-
-    /**
-     * 指定されたアイテムが相場テーブルに無ければ初期値（0個、等倍）でレコードを生成する保護メソッド
-     */
-    private void ensureItemMarketSync(Connection connection, String itemId) throws SQLException {
-        String sql = "INSERT IGNORE INTO ec_item_market (item_id, sales_count, modifier) VALUES (?, 0, 1.00)";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, itemId);
-            statement.executeUpdate();
-        }
-    }
-
-    // ==========================================
-    //  👆 【新規拡張終了】
-    // ==========================================
-
     public static BigDecimal money(int value) {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
     }
-    
+                 
     public static BigDecimal money(String text) {
         return new BigDecimal(text).setScale(2, RoundingMode.HALF_UP);
     }
@@ -800,21 +709,5 @@ public final class MySqlEconomyStore implements AutoCloseable {
     @FunctionalInterface
     private interface SqlRunnable {
         void run() throws SQLException;
-    }
-
-    // ==========================================
-    //  👇 データの架け橋となるインナークラスレコード
-    // ==========================================
-    public static final class SalesData {
-        private final int sales;
-        private final BigDecimal modifier;
-
-        public SalesData(int sales, BigDecimal modifier) {
-            this.sales = sales;
-            this.modifier = modifier;
-        }
-
-        public int getSales() { return sales; }
-        public BigDecimal getModifier() { return modifier; }
     }
 }
